@@ -34,7 +34,7 @@ async function open_(pw){
   const btn = document.getElementById('go'), err = document.getElementById('err');
   btn.disabled = true; btn.textContent = 'Загружаю…'; err.textContent = '';
   try{
-    const parts = await Promise.all(Array.from({length: META.parts}, (_, i) => fetch(`p${i}.bin`, {cache:'force-cache'}).then(r => { if(!r.ok) throw new Error('net'); return r.arrayBuffer(); })));
+    const parts = await Promise.all(Array.from({length: META.parts}, (_, i) => fetch(`p${i}.bin?v=${encodeURIComponent(META.iv)}`, {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('net'); return r.arrayBuffer(); })));
     const len = parts.reduce((s, p) => s + p.byteLength, 0), ct = new Uint8Array(len); let o = 0; for (const p of parts){ ct.set(new Uint8Array(p), o); o += p.byteLength; }
     const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
     const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64(META.salt), iterations:META.iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
