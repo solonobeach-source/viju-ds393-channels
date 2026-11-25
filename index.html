@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>viju · DS-393 · Список каналов</title>
+<meta name="robots" content="noindex">
+<style>
+:root{color-scheme:dark}
+html,body{height:100%;margin:0;background:#0b0b0d;color:#f4f0ef;font:500 15px/1.4 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box}
+form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px}
+.tag{align-self:flex-start;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.07);font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(244,240,239,.56)}
+h1{margin:0;font-size:24px;line-height:1.2}
+p{margin:0;color:rgba(244,240,239,.6);font-size:14px}
+input[type=password]{height:48px;padding:0 16px;border-radius:12px;border:0;background:rgba(255,255,255,.08);color:#fff;font:inherit;outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+input[type=password]:focus{box-shadow:inset 0 0 0 2px #00c7b2}
+label{display:flex;gap:8px;align-items:center;font-size:13px;color:rgba(244,240,239,.7)}
+button{height:48px;border:0;border-radius:12px;background:#00c7b2;color:#06201d;font:700 15px/1 inherit;font-family:inherit;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.err{color:#ff6b6b;font-size:13px;min-height:18px}
+</style></head><body>
+<div class="wrap"><form id="f" autocomplete="off">
+<span class="tag">VIJU · DS-393</span>
+<h1>Список каналов</h1>
+<p>Прототип и спецификация для разработки iOS и Android. Введите пароль.</p>
+<input type="password" id="pw" placeholder="Пароль" autofocus>
+<label><input type="checkbox" id="rem"> Запомнить на этом устройстве</label>
+<button id="go" type="submit">Открыть</button>
+<div class="err" id="err"></div>
+</form></div>
+<script>
+const META = {"salt": "Sl47CskJJPPvK3+Bo/xksA==", "iv": "PyZsdgigcPI79W/e", "parts": 3, "iter": 600000};
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const KEY = 'viju-ds393-pw';
+async function open_(pw){
+  const btn = document.getElementById('go'), err = document.getElementById('err');
+  btn.disabled = true; btn.textContent = 'Загружаю…'; err.textContent = '';
+  try{
+    const parts = await Promise.all(Array.from({length: META.parts}, (_, i) => fetch(`p${i}.bin`, {cache:'force-cache'}).then(r => { if(!r.ok) throw new Error('net'); return r.arrayBuffer(); })));
+    const len = parts.reduce((s, p) => s + p.byteLength, 0), ct = new Uint8Array(len); let o = 0; for (const p of parts){ ct.set(new Uint8Array(p), o); o += p.byteLength; }
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64(META.salt), iterations:META.iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+    let plain;
+    try{ plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(META.iv)}, key, ct); }
+    catch(e){ try{ localStorage.removeItem(KEY); }catch(_){} throw new Error('pw'); }
+    if (document.getElementById('rem').checked) { try{ localStorage.setItem(KEY, pw); }catch(_){} }
+    const html = new TextDecoder().decode(plain);
+    document.open(); document.write(html); document.close();
+  }catch(e){
+    btn.disabled = false; btn.textContent = 'Открыть';
+    err.textContent = e.message === 'pw' ? 'Неверный пароль' : 'Не удалось загрузить. Обновите страницу.';
+  }
+}
+document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); open_(document.getElementById('pw').value); });
+try{ const saved = localStorage.getItem(KEY); if (saved){ document.getElementById('rem').checked = true; open_(saved); } }catch(_){}
+</script>
+</body></html>
